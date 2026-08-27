@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Lingua",
-  description: "A modern Next.js app for your language project.",
+  title: "Polyglot Language Learner",
+  description: "Study one language through another with guided, reusable workflows.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

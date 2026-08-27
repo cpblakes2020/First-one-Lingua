@@ -36,6 +36,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# local app-managed document storage
+/.lingua-storage/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

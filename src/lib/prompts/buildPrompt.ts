@@ -1,0 +1,29 @@
+import { getPromptTemplate } from "@/lib/prompts/templates";
+import type { Language, LearnerLevel, OutputStyle, PromptTemplateId } from "@/lib/types";
+
+type BuildPromptInput = {
+  text: string;
+  sourceLanguage: Language;
+  userLanguage: Language;
+  learnerLevel: LearnerLevel;
+  outputStyle: OutputStyle;
+  promptTemplateId: PromptTemplateId;
+};
+
+export function buildStudyPrompt(input: BuildPromptInput) {
+  const template = getPromptTemplate(input.promptTemplateId);
+  if (!template) throw new Error("Unsupported prompt template.");
+
+  return [
+    "You are a careful multilingual language-learning assistant.",
+    `Source language: ${input.sourceLanguage}.`,
+    `Explanation language: ${input.userLanguage}.`,
+    `Learner level: ${input.learnerLevel}.`,
+    `Output style: ${input.outputStyle}.`,
+    "Follow the requested task and keep the source language and explanation language distinct.",
+    "Prefer target-language-first explanations where the task allows it. Label each language clearly.",
+    `Task: ${template.instruction}`,
+    "Source text:",
+    input.text.trim(),
+  ].join("\n\n");
+}
