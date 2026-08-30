@@ -9,10 +9,16 @@ type LanguageSettingsProps = {
   explanationLanguage: Language;
   learnerLevel: LearnerLevel;
   outputStyle: OutputStyle;
+  apiKey: string;
+  workspaceKey: string;
+  workspaceStatus: string;
   onSourceLanguageChange: (language: Language) => void;
   onExplanationLanguageChange: (language: Language) => void;
   onLearnerLevelChange: (level: LearnerLevel) => void;
   onOutputStyleChange: (style: OutputStyle) => void;
+  onApiKeyChange: (apiKey: string) => void;
+  onWorkspaceKeyChange: (workspaceKey: string) => void;
+  onCopyWorkspaceKey: () => void;
   onPresetChange: (sourceLanguage: Language, explanationLanguage: Language) => void;
 };
 
@@ -21,10 +27,16 @@ export function LanguageSettings({
   explanationLanguage,
   learnerLevel,
   outputStyle,
+  apiKey,
+  workspaceKey,
+  workspaceStatus,
   onSourceLanguageChange,
   onExplanationLanguageChange,
   onLearnerLevelChange,
   onOutputStyleChange,
+  onApiKeyChange,
+  onWorkspaceKeyChange,
+  onCopyWorkspaceKey,
   onPresetChange,
 }: LanguageSettingsProps) {
   return (
@@ -51,6 +63,17 @@ export function LanguageSettings({
       <div className="context-note"><span aria-hidden="true">◎</span><p>The explanation language can be different from your native language. That is the point.</p></div>
       <div className="setting-row"><label htmlFor="level">Learner level</label><select id="level" value={learnerLevel} onChange={(event) => onLearnerLevelChange(event.target.value as LearnerLevel)}><option>Beginner</option><option>Intermediate</option><option>Advanced</option></select></div>
       <div className="setting-row"><label htmlFor="style">Output style</label><select id="style" value={outputStyle} onChange={(event) => onOutputStyleChange(event.target.value as OutputStyle)}><option>Concise</option><option>Detailed</option><option>Literal</option><option>Natural</option><option>Formal</option><option>Informal</option></select></div>
+      <div className="api-key-setting">
+        <label htmlFor="anthropic-api-key">Your Anthropic API key</label>
+        <input id="anthropic-api-key" type="password" value={apiKey} autoComplete="off" spellCheck={false} placeholder="Optional: use your own key" onChange={(event) => onApiKeyChange(event.target.value)} />
+        <p>This key is used only for this browser session and is never saved.</p>
+      </div>
+      <div className="workspace-sync-setting">
+        <label htmlFor="workspace-sync-code">Private sync code</label>
+        <input id="workspace-sync-code" value={workspaceKey} autoComplete="off" spellCheck={false} onChange={(event) => onWorkspaceKeyChange(event.target.value.trim())} />
+        <div><button type="button" onClick={onCopyWorkspaceKey}>Copy code</button><span role="status">{workspaceStatus}</span></div>
+        <p>Keep this code private. Enter it on another device to open the same encrypted reviews.</p>
+      </div>
       <span className="language-count">{languages.length} languages available</span>
     </aside>
   );

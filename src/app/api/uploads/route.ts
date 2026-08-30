@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import path from "node:path";
 import { readFile } from "node:fs/promises";
 import { extractDocumentText } from "@/lib/extraction";
-import { extractTextWithClaude } from "@/lib/llm/claude";
+import { getLlmProvider, getRequestApiKey } from "@/lib/llm/provider";
 import { storeDocument } from "@/lib/storage/filesystem";
 
 export const maxDuration = 60;
@@ -31,6 +31,7 @@ function getDocumentType(file: File) {
 
 export async function POST(request: Request) {
   try {
+    const apiKey = getRequestApiKey(request);
     const formData = await request.formData();
     const file = formData.get("file");
 
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
     const source = await readFile(storedDocument.storagePath);
     let extracted = { text: "", pageCount: 1 };
     if (documentType === "image/jpeg" || documentType === "image/png") {
-      extracted.text = await extractTextWithClaude(source, documentType);
+      extracted.text = await getLlmProvider().extractText(source, documentType, apiKey);
     } else {
       try {
         extracted = await extractDocumentText(storedDocument.storagePath, documentType);
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
         if (documentType !== "application/pdf") throw error;
       }
       if (!extracted.text && documentType === "application/pdf") {
-        extracted.text = await extractTextWithClaude(source, documentType);
+        extracted.text = await getLlmProvider().extractText(source, documentType, apiKey);
       }
     }
     if (!extracted.text) {

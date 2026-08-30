@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { readJsonBlob, writeJsonBlob } from "@/lib/storage/blob-json";
+import type { Flashcard } from "@/lib/flashcards";
 import type { Language, LearnerLevel, OutputStyle, PromptTemplateId } from "@/lib/types";
 
 const blobPathname = "lingua/task-runs.json";
@@ -13,6 +14,7 @@ export type SavedTaskRun = {
   outputStyle: OutputStyle;
   promptTemplateId: PromptTemplateId;
   result: string;
+  flashcards?: Flashcard[];
   notes: string;
   createdAt: string;
 };

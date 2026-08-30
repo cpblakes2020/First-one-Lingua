@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { runClaudeTask } from "@/lib/llm/claude";
+import { getLlmProvider, getRequestApiKey } from "@/lib/llm/provider";
+import { parseFlashcards } from "@/lib/flashcards";
 import { isSupportedLanguage } from "@/lib/presets";
 import { getPromptTemplate } from "@/lib/prompts/templates";
 import type { LearnerLevel, OutputStyle, PromptTemplateId } from "@/lib/types";
@@ -30,15 +31,19 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await runClaudeTask({
+    const result = await getLlmProvider().runTask({
       text,
       sourceLanguage,
       userLanguage,
       learnerLevel: learnerLevel as LearnerLevel,
       outputStyle: outputStyle as OutputStyle,
       promptTemplateId: promptTemplateId as PromptTemplateId,
-    });
-    return NextResponse.json({ result, promptTemplateId });
+    }, getRequestApiKey(request));
+    const flashcards = promptTemplateId === "flashcards" ? parseFlashcards(result) : undefined;
+    if (promptTemplateId === "flashcards" && !flashcards) {
+      return NextResponse.json({ error: "Claude returned flashcards in an unexpected format. Please run the task again." }, { status: 502 });
+    }
+    return NextResponse.json({ result, promptTemplateId, flashcards });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "The task could not be completed." }, { status: 502 });
   }

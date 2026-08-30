@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { listTaskRuns, saveTaskRun } from "@/lib/storage/task-runs";
 import { isSupportedLanguage } from "@/lib/presets";
 import { getPromptTemplate } from "@/lib/prompts/templates";
+import type { Flashcard } from "@/lib/flashcards";
 import type { LearnerLevel, OutputStyle, PromptTemplateId } from "@/lib/types";
 
 const learnerLevels = new Set<LearnerLevel>(["Beginner", "Intermediate", "Advanced"]);
@@ -24,6 +25,7 @@ export async function POST(request: Request) {
   const learnerLevel = body?.learnerLevel;
   const outputStyle = body?.outputStyle;
   const promptTemplateId = body?.promptTemplateId;
+  const flashcards = body?.flashcards;
 
   if (typeof sourceText !== "string" || !sourceText.trim() || sourceText.length > 12000 || typeof result !== "string" || !result.trim()) {
     return NextResponse.json({ error: "A source text and completed result are required." }, { status: 400 });
@@ -37,6 +39,9 @@ export async function POST(request: Request) {
   if (typeof promptTemplateId !== "string" || !getPromptTemplate(promptTemplateId as PromptTemplateId)) {
     return NextResponse.json({ error: "Choose a supported prompt template." }, { status: 400 });
   }
+  if (flashcards !== undefined && (!Array.isArray(flashcards) || flashcards.some((card) => !card || typeof card !== "object" || typeof (card as Flashcard).front !== "string" || typeof (card as Flashcard).back !== "string" || !Array.isArray((card as Flashcard).tags)))) {
+    return NextResponse.json({ error: "Flashcards must contain a front, back, and tags." }, { status: 400 });
+  }
 
   try {
     const taskRun = await saveTaskRun({
@@ -48,6 +53,7 @@ export async function POST(request: Request) {
       learnerLevel: learnerLevel as LearnerLevel,
       outputStyle: outputStyle as OutputStyle,
       promptTemplateId: promptTemplateId as PromptTemplateId,
+      flashcards: flashcards as Flashcard[] | undefined,
     });
     return NextResponse.json({ taskRun }, { status: 201 });
   } catch (error) {

@@ -7,9 +7,16 @@ function escapeCell(value: string, delimiter: string) {
 }
 
 export function taskRunExport(run: SavedTaskRun, delimiter: "," | "\t") {
-  const headers = ["Front", "Back", "Source language", "Explanation language", "Prompt", "Notes"];
-  const values = [run.sourceText, run.result, run.sourceLanguage, run.userLanguage, run.promptTemplateId, run.notes || ""];
-  return `${headers.map((header) => escapeCell(header, delimiter)).join(delimiter)}\n${values.map((value) => escapeCell(value, delimiter)).join(delimiter)}\n`;
+  const headers = ["Front", "Back", "Source language", "Explanation language", "Prompt", "Notes", "Tags", "Direction"];
+  const cards = run.flashcards?.length ? run.flashcards : [{ front: run.sourceText, back: run.result, tags: [] }];
+  const rows = cards.flatMap((card) => {
+    const tags = [...new Set([`polyglot::${run.sourceLanguage.toLowerCase()}-${run.userLanguage.toLowerCase()}`, `template::${run.promptTemplateId}`, ...card.tags])].join(" ");
+    return [
+      [card.front, card.back, run.sourceLanguage, run.userLanguage, run.promptTemplateId, run.notes || "", tags, `${run.sourceLanguage} to ${run.userLanguage}`],
+      [card.back, card.front, run.userLanguage, run.sourceLanguage, run.promptTemplateId, run.notes || "", tags, `${run.userLanguage} to ${run.sourceLanguage}`],
+    ];
+  });
+  return [headers, ...rows].map((row) => row.map((value) => escapeCell(value, delimiter)).join(delimiter)).join("\n") + "\n";
 }
 
 export function downloadTaskRun(run: SavedTaskRun, format: "csv" | "tsv" | "txt") {

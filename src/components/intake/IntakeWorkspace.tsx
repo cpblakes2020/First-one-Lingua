@@ -5,7 +5,9 @@ import { LanguageSettings } from "@/components/intake/LanguageSettings";
 import { PromptTemplatePicker } from "@/components/intake/PromptTemplatePicker";
 import { UploadPanel } from "@/components/intake/UploadPanel";
 import { SavedReview } from "@/components/review/SavedReview";
+import type { Flashcard } from "@/lib/flashcards";
 import type { SavedTaskRun } from "@/lib/storage/task-runs";
+import { createWorkspaceKey, decryptWorkspace, encryptWorkspace, isWorkspaceKey } from "@/lib/workspace-crypto";
 import type { Language, LearnerLevel, OutputStyle, PromptTemplateId } from "@/lib/types";
 
 const examples = [
@@ -24,6 +26,7 @@ async function parseJsonResponse<T>(response: Response): Promise<T> {
 }
 
 const languagePreferenceKey = "lingua:languagePreference";
+const workspaceKeyPreferenceKey = "lingua:workspaceKey";
 const defaultSourceLanguage: Language = "Indonesian";
 const defaultExplanationLanguage: Language = "English";
 
@@ -55,10 +58,40 @@ export function IntakeWorkspace() {
   const [taskResult, setTaskResult] = useState("");
   const [reviewRuns, setReviewRuns] = useState<SavedTaskRun[]>([]);
   const [reviewStatus, setReviewStatus] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
+  const [workspaceKey, setWorkspaceKey] = useState("");
+  const [workspaceStatus, setWorkspaceStatus] = useState("Preparing private sync...");
 
   useEffect(() => {
-    void fetch("/api/task-runs").then((response) => response.json()).then((data: { taskRuns?: SavedTaskRun[] }) => setReviewRuns(data.taskRuns || [])).catch(() => undefined);
+    const savedWorkspaceKey = window.localStorage.getItem(workspaceKeyPreferenceKey);
+    const nextWorkspaceKey = savedWorkspaceKey && isWorkspaceKey(savedWorkspaceKey) ? savedWorkspaceKey : createWorkspaceKey();
+    window.localStorage.setItem(workspaceKeyPreferenceKey, nextWorkspaceKey);
+    setWorkspaceKey(nextWorkspaceKey);
   }, []);
+
+  useEffect(() => {
+    if (!isWorkspaceKey(workspaceKey)) {
+      if (workspaceKey) setWorkspaceStatus("Enter the 43-character sync code to load reviews.");
+      return;
+    }
+    window.localStorage.setItem(workspaceKeyPreferenceKey, workspaceKey);
+    setWorkspaceStatus("Loading encrypted reviews...");
+    void (async () => {
+      try {
+        const response = await fetch("/api/workspace", { headers: { "x-polyglot-workspace-key": workspaceKey } });
+        const data = await parseJsonResponse<{ error?: string; payload?: string | null }>(response);
+        if (!response.ok) throw new Error(data.error || "The private workspace could not be loaded.");
+        const runs = data.payload ? await decryptWorkspace<unknown>(data.payload, workspaceKey) : [];
+        if (!Array.isArray(runs)) throw new Error("The private workspace is invalid.");
+        setReviewRuns(runs as SavedTaskRun[]);
+        setWorkspaceStatus(data.payload ? "Encrypted reviews synced" : "New private workspace ready");
+      } catch (error) {
+        setReviewRuns([]);
+        setWorkspaceStatus(error instanceof Error ? error.message : "The private workspace could not be loaded.");
+      }
+    })();
+  }, [workspaceKey]);
 
   useEffect(() => {
     const preference = loadLanguagePreference();
@@ -114,15 +147,17 @@ export function IntakeWorkspace() {
   async function runTask() {
     setTaskStatus("Working with Claude...");
     setTaskResult("");
+    setFlashcards([]);
     try {
       const response = await fetch("/api/tasks/run", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(apiKey ? { "x-polyglot-anthropic-key": apiKey } : {}) },
         body: JSON.stringify({ text, sourceLanguage, userLanguage: explanationLanguage, learnerLevel, outputStyle, promptTemplateId: selectedTemplate }),
       });
-      const result = await parseJsonResponse<{ error?: string; result?: string }>(response);
+      const result = await parseJsonResponse<{ error?: string; result?: string; flashcards?: Flashcard[] }>(response);
       if (!response.ok || !result.result) throw new Error(result.error || "The task could not be completed.");
       setTaskResult(result.result);
+      setFlashcards(result.flashcards || []);
       setTaskStatus("Task complete");
     } catch (error) {
       setTaskStatus(error instanceof Error ? error.message : "The task could not be completed.");
@@ -132,14 +167,10 @@ export function IntakeWorkspace() {
   async function saveForReview() {
     setReviewStatus("Saving...");
     try {
-      const response = await fetch("/api/task-runs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sourceText: text, result: taskResult, sourceLanguage, userLanguage: explanationLanguage, learnerLevel, outputStyle, promptTemplateId: selectedTemplate }),
-      });
-      const data = await parseJsonResponse<{ error?: string; taskRun?: SavedTaskRun }>(response);
-      if (!response.ok || !data.taskRun) throw new Error(data.error || "The result could not be saved.");
-      setReviewRuns((runs) => [data.taskRun!, ...runs]);
+      const taskRun: SavedTaskRun = { taskRunId: crypto.randomUUID(), sourceText: text.trim(), result: taskResult.trim(), flashcards, sourceLanguage, userLanguage: explanationLanguage, learnerLevel, outputStyle, promptTemplateId: selectedTemplate, notes: "", createdAt: new Date().toISOString() };
+      const runs = [taskRun, ...reviewRuns];
+      await saveWorkspaceReviews(runs);
+      setReviewRuns(runs);
       setReviewStatus("Saved for review");
     } catch (error) {
       setReviewStatus(error instanceof Error ? error.message : "The result could not be saved.");
@@ -154,22 +185,48 @@ export function IntakeWorkspace() {
     setOutputStyle(run.outputStyle);
     setSelectedTemplate(run.promptTemplateId);
     setTaskResult(run.result);
+    setFlashcards(run.flashcards || []);
     setTaskStatus("Saved result opened");
     setReviewStatus("");
   }
 
   async function updateSavedRun(run: SavedTaskRun) {
-    const response = await fetch(`/api/task-runs/${run.taskRunId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ notes: run.notes }),
-    });
-    if (response.ok) setReviewRuns((runs) => runs.map((item) => item.taskRunId === run.taskRunId ? run : item));
+    const runs = reviewRuns.map((item) => item.taskRunId === run.taskRunId ? run : item);
+    try {
+      await saveWorkspaceReviews(runs);
+      setReviewRuns(runs);
+    } catch {
+      setWorkspaceStatus("Notes could not be synced.");
+    }
   }
 
   async function deleteSavedRun(taskRunId: string) {
-    const response = await fetch(`/api/task-runs/${taskRunId}`, { method: "DELETE" });
-    if (response.ok) setReviewRuns((runs) => runs.filter((run) => run.taskRunId !== taskRunId));
+    const runs = reviewRuns.filter((run) => run.taskRunId !== taskRunId);
+    try {
+      await saveWorkspaceReviews(runs);
+      setReviewRuns(runs);
+    } catch {
+      setWorkspaceStatus("The review could not be deleted from sync.");
+    }
+  }
+
+  async function saveWorkspaceReviews(runs: SavedTaskRun[]) {
+    if (!isWorkspaceKey(workspaceKey)) throw new Error("Enter a valid private sync code before saving.");
+    setWorkspaceStatus("Encrypting and syncing reviews...");
+    const payload = await encryptWorkspace(runs, workspaceKey);
+    const response = await fetch("/api/workspace", { method: "PUT", headers: { "Content-Type": "application/json", "x-polyglot-workspace-key": workspaceKey }, body: JSON.stringify({ payload }) });
+    const data = await parseJsonResponse<{ error?: string }>(response);
+    if (!response.ok) throw new Error(data.error || "The private workspace could not be saved.");
+    setWorkspaceStatus("Encrypted reviews synced");
+  }
+
+  async function copyWorkspaceKey() {
+    try {
+      await navigator.clipboard.writeText(workspaceKey);
+      setWorkspaceStatus("Sync code copied");
+    } catch {
+      setWorkspaceStatus("Copy the sync code manually.");
+    }
   }
 
   function clearInput() {
@@ -179,6 +236,7 @@ export function IntakeWorkspace() {
     setPromptPreview("");
     setTaskStatus("");
     setTaskResult("");
+    setFlashcards([]);
   }
 
   return (
@@ -202,13 +260,13 @@ export function IntakeWorkspace() {
               <div className="input-action-row"><button className="save-input-button" type="button" disabled={!text.trim()} onClick={() => void saveTextInput()}>Save study input</button><button className="preview-prompt-button" type="button" disabled={!text.trim()} onClick={() => void previewPrompt()}>Preview task prompt</button><button className="run-task-button" type="button" disabled={!text.trim() || taskStatus === "Working with Claude..."} onClick={() => void runTask()}>Run task</button>{saveStatus && <span className="example-status" role="status">{saveStatus}</span>}</div>
               {promptPreview && <pre className="prompt-preview" aria-label="Task prompt preview">{promptPreview}</pre>}
               {taskStatus && <p className="task-status" role="status">{taskStatus}</p>}
-              {taskResult && <section className="task-result" aria-label="Claude task result"><div className="result-label">Claude result · {explanationLanguage}</div><div className="result-text">{taskResult}</div><div className="result-actions"><button className="save-input-button" type="button" onClick={() => void saveForReview()}>Save for review</button>{reviewStatus && <span className="example-status" role="status">{reviewStatus}</span>}</div></section>}
+              {taskResult && <section className="task-result" aria-label="Claude task result"><div className="result-label">Claude result · {explanationLanguage}</div>{flashcards.length ? <div className="flashcard-editor">{flashcards.map((card, index) => <article className="flashcard-edit" key={`${index}-${card.front}`}><label>Front<textarea value={card.front} onChange={(event) => setFlashcards((cards) => cards.map((item, itemIndex) => itemIndex === index ? { ...item, front: event.target.value } : item))} /></label><label>Back<textarea value={card.back} onChange={(event) => setFlashcards((cards) => cards.map((item, itemIndex) => itemIndex === index ? { ...item, back: event.target.value } : item))} /></label><label>Tags<input value={card.tags.join(", ")} onChange={(event) => setFlashcards((cards) => cards.map((item, itemIndex) => itemIndex === index ? { ...item, tags: event.target.value.split(",").map((tag) => tag.trim()).filter(Boolean) } : item))} /></label><button type="button" className="remove-card-button" aria-label={`Remove flashcard ${index + 1}`} onClick={() => setFlashcards((cards) => cards.filter((_, itemIndex) => itemIndex !== index))}>Remove</button></article>)}<button className="preview-prompt-button" type="button" onClick={() => setFlashcards((cards) => [...cards, { front: "", back: "", tags: [] }])}>Add card</button></div> : <div className="result-text">{taskResult}</div>}<div className="result-actions"><button className="save-input-button" type="button" disabled={!isWorkspaceKey(workspaceKey) || flashcards.some((card) => !card.front.trim() || !card.back.trim())} onClick={() => void saveForReview()}>Save for review</button>{reviewStatus && <span className="example-status" role="status">{reviewStatus}</span>}</div></section>}
             </>
           ) : (
-            <UploadPanel onTextExtracted={(extractedText, filename) => { setText(extractedText); setLoadedExample(`${filename} loaded`); setMode("text"); }} />
+            <UploadPanel apiKey={apiKey} onTextExtracted={(extractedText, filename) => { setText(extractedText); setLoadedExample(`${filename} loaded`); setMode("text"); }} />
           )}
         </div>
-        <LanguageSettings sourceLanguage={sourceLanguage} explanationLanguage={explanationLanguage} learnerLevel={learnerLevel} outputStyle={outputStyle} onSourceLanguageChange={(language) => { setSourceLanguage(language); if (language !== "Thai" && selectedTemplate === "thai-script-conversion") setSelectedTemplate("word-analysis"); }} onExplanationLanguageChange={setExplanationLanguage} onLearnerLevelChange={setLearnerLevel} onOutputStyleChange={setOutputStyle} onPresetChange={(source, explanation) => { setSourceLanguage(source); setExplanationLanguage(explanation); if (source !== "Thai" && selectedTemplate === "thai-script-conversion") setSelectedTemplate("word-analysis"); }} />
+        <LanguageSettings sourceLanguage={sourceLanguage} explanationLanguage={explanationLanguage} learnerLevel={learnerLevel} outputStyle={outputStyle} apiKey={apiKey} workspaceKey={workspaceKey} workspaceStatus={workspaceStatus} onSourceLanguageChange={(language) => { setSourceLanguage(language); if (language !== "Thai" && selectedTemplate === "thai-script-conversion") setSelectedTemplate("word-analysis"); }} onExplanationLanguageChange={setExplanationLanguage} onLearnerLevelChange={setLearnerLevel} onOutputStyleChange={setOutputStyle} onApiKeyChange={setApiKey} onWorkspaceKeyChange={setWorkspaceKey} onCopyWorkspaceKey={() => void copyWorkspaceKey()} onPresetChange={(source, explanation) => { setSourceLanguage(source); setExplanationLanguage(explanation); if (source !== "Thai" && selectedTemplate === "thai-script-conversion") setSelectedTemplate("word-analysis"); }} />
       </section>
       <section className="template-section" aria-labelledby="template-title"><PromptTemplatePicker selectedTemplate={selectedTemplate} sourceLanguage={sourceLanguage} onTemplateChange={setSelectedTemplate} /></section>
       <SavedReview runs={reviewRuns} onOpen={openSavedRun} onUpdate={(run) => void updateSavedRun(run)} onDelete={(taskRunId) => void deleteSavedRun(taskRunId)} />

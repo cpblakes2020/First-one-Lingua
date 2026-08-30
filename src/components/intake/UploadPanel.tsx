@@ -4,9 +4,10 @@ import { useRef, useState } from "react";
 
 type UploadPanelProps = {
   onTextExtracted: (text: string, filename: string) => void;
+  apiKey: string;
 };
 
-export function UploadPanel({ onTextExtracted }: UploadPanelProps) {
+export function UploadPanel({ onTextExtracted, apiKey }: UploadPanelProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState("");
   const [isUploading, setIsUploading] = useState(false);
@@ -22,7 +23,7 @@ export function UploadPanel({ onTextExtracted }: UploadPanelProps) {
     formData.append("file", file);
 
     try {
-      const response = await fetch("/api/uploads", { method: "POST", body: formData });
+      const response = await fetch("/api/uploads", { method: "POST", headers: apiKey ? { "x-polyglot-anthropic-key": apiKey } : undefined, body: formData });
       const raw = await response.text();
       let result: { error?: string; text?: string; filename?: string; pageCount?: number };
       try {
