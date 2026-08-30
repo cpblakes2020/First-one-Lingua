@@ -5,6 +5,8 @@ import { extractDocumentText } from "@/lib/extraction";
 import { extractTextWithClaude } from "@/lib/llm/claude";
 import { storeDocument } from "@/lib/storage/filesystem";
 
+export const maxDuration = 60;
+
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const docxMimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const supportedTypes = new Set(["text/html", "text/plain", "text/xml", "application/xml", "application/pdf", docxMimeType, "image/jpeg", "image/png"]);

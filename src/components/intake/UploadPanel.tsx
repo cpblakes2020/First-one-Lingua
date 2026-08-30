@@ -19,7 +19,13 @@ export function UploadPanel({ onTextExtracted }: UploadPanelProps) {
 
     try {
       const response = await fetch("/api/uploads", { method: "POST", body: formData });
-      const result = await response.json() as { error?: string; text?: string; filename?: string; pageCount?: number };
+      const raw = await response.text();
+      let result: { error?: string; text?: string; filename?: string; pageCount?: number };
+      try {
+        result = JSON.parse(raw);
+      } catch {
+        throw new Error(response.ok ? "The server returned an unexpected response." : `Server error (${response.status}). The document may be too large or took too long to process.`);
+      }
       if (!response.ok || !result.text || !result.filename) throw new Error(result.error || "The document could not be read.");
       onTextExtracted(result.text, result.filename);
       setStatus(`${result.filename} loaded${result.pageCount && result.pageCount > 1 ? ` · ${result.pageCount} pages` : ""}`);
