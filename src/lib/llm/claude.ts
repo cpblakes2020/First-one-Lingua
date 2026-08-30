@@ -22,8 +22,8 @@ function getResponseText(result: ClaudeResponse) {
 }
 
 export async function runClaudeTask(input: ClaudeInput, suppliedApiKey?: string) {
-  const apiKey = suppliedApiKey || process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not configured on the server.");
+  const apiKey = suppliedApiKey;
+  if (!apiKey) throw new Error("Add your Anthropic API key before running a task.");
 
   const response = await fetch(anthropicEndpoint, {
     method: "POST",
@@ -48,8 +48,8 @@ export async function runClaudeTask(input: ClaudeInput, suppliedApiKey?: string)
 }
 
 export async function extractTextWithClaude(source: Buffer, mimeType: string, suppliedApiKey?: string) {
-  const apiKey = suppliedApiKey || process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not configured on the server.");
+  const apiKey = suppliedApiKey;
+  if (!apiKey) throw new Error("Add your Anthropic API key before extracting text with Claude.");
   const sourceType = mimeType === "application/pdf" ? "document" : "image";
   const response = await fetch(anthropicEndpoint, {
     method: "POST",

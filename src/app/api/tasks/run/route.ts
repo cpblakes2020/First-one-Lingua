@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getLlmProvider, getRequestApiKey } from "@/lib/llm/provider";
+import { getLlmProvider, getRequestApiKey, getRequestProvider } from "@/lib/llm/provider";
 import { parseFlashcards } from "@/lib/flashcards";
 import { isSupportedLanguage } from "@/lib/presets";
 import { getPromptTemplate } from "@/lib/prompts/templates";
@@ -31,7 +31,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await getLlmProvider().runTask({
+    const provider = getRequestProvider(request);
+    const result = await getLlmProvider(provider).runTask({
       text,
       sourceLanguage,
       userLanguage,
@@ -41,7 +42,7 @@ export async function POST(request: Request) {
     }, getRequestApiKey(request));
     const flashcards = promptTemplateId === "flashcards" ? parseFlashcards(result) : undefined;
     if (promptTemplateId === "flashcards" && !flashcards) {
-      return NextResponse.json({ error: "Claude returned flashcards in an unexpected format. Please run the task again." }, { status: 502 });
+      return NextResponse.json({ error: "The provider returned flashcards in an unexpected format. Please run the task again." }, { status: 502 });
     }
     return NextResponse.json({ result, promptTemplateId, flashcards });
   } catch (error) {

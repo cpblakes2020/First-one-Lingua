@@ -8,6 +8,7 @@ import { SavedReview } from "@/components/review/SavedReview";
 import type { Flashcard } from "@/lib/flashcards";
 import type { SavedTaskRun } from "@/lib/storage/task-runs";
 import { createWorkspaceKey, decryptWorkspace, encryptWorkspace, isWorkspaceKey } from "@/lib/workspace-crypto";
+import type { LlmProviderId } from "@/lib/llm/provider";
 import type { Language, LearnerLevel, OutputStyle, PromptTemplateId } from "@/lib/types";
 
 const examples = [
@@ -27,6 +28,8 @@ async function parseJsonResponse<T>(response: Response): Promise<T> {
 
 const languagePreferenceKey = "lingua:languagePreference";
 const workspaceKeyPreferenceKey = "lingua:workspaceKey";
+const providerKeyPreferenceKey = "lingua:providerKeys";
+const selectedProviderPreferenceKey = "lingua:selectedProvider";
 const defaultSourceLanguage: Language = "Indonesian";
 const defaultExplanationLanguage: Language = "English";
 
@@ -41,6 +44,18 @@ function loadLanguagePreference(): { sourceLanguage: Language; explanationLangua
   } catch {
     return { sourceLanguage: defaultSourceLanguage, explanationLanguage: defaultExplanationLanguage };
   }
+}
+
+function loadProviderKeys(): Partial<Record<LlmProviderId, string>> {
+  try {
+    return JSON.parse(window.localStorage.getItem(providerKeyPreferenceKey) || "{}") as Partial<Record<LlmProviderId, string>>;
+  } catch {
+    return {};
+  }
+}
+
+function saveProviderKeys(keys: Partial<Record<LlmProviderId, string>>) {
+  window.localStorage.setItem(providerKeyPreferenceKey, JSON.stringify(keys));
 }
 
 export function IntakeWorkspace() {
@@ -59,6 +74,8 @@ export function IntakeWorkspace() {
   const [reviewRuns, setReviewRuns] = useState<SavedTaskRun[]>([]);
   const [reviewStatus, setReviewStatus] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const [providerId, setProviderId] = useState<LlmProviderId>("anthropic");
+  const [rememberApiKey, setRememberApiKey] = useState(false);
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [workspaceKey, setWorkspaceKey] = useState("");
   const [workspaceStatus, setWorkspaceStatus] = useState("Preparing private sync...");
@@ -68,6 +85,15 @@ export function IntakeWorkspace() {
     const nextWorkspaceKey = savedWorkspaceKey && isWorkspaceKey(savedWorkspaceKey) ? savedWorkspaceKey : createWorkspaceKey();
     window.localStorage.setItem(workspaceKeyPreferenceKey, nextWorkspaceKey);
     setWorkspaceKey(nextWorkspaceKey);
+  }, []);
+
+  useEffect(() => {
+    const savedProvider = window.localStorage.getItem(selectedProviderPreferenceKey);
+    const nextProvider = savedProvider === "openai" ? "openai" : "anthropic";
+    const keys = loadProviderKeys();
+    setProviderId(nextProvider);
+    setApiKey(keys[nextProvider] || "");
+    setRememberApiKey(Boolean(keys[nextProvider]));
   }, []);
 
   useEffect(() => {
@@ -112,6 +138,35 @@ export function IntakeWorkspace() {
     }
   }
 
+  function changeProvider(nextProvider: LlmProviderId) {
+    const keys = loadProviderKeys();
+    setProviderId(nextProvider);
+    setApiKey(keys[nextProvider] || "");
+    setRememberApiKey(Boolean(keys[nextProvider]));
+    window.localStorage.setItem(selectedProviderPreferenceKey, nextProvider);
+  }
+
+  function changeApiKey(nextApiKey: string) {
+    setApiKey(nextApiKey);
+    if (rememberApiKey) saveProviderKeys({ ...loadProviderKeys(), [providerId]: nextApiKey });
+  }
+
+  function changeRememberApiKey(remember: boolean) {
+    setRememberApiKey(remember);
+    const keys = loadProviderKeys();
+    if (remember && apiKey) keys[providerId] = apiKey;
+    if (!remember) delete keys[providerId];
+    saveProviderKeys(keys);
+  }
+
+  function forgetApiKey() {
+    const keys = loadProviderKeys();
+    delete keys[providerId];
+    saveProviderKeys(keys);
+    setApiKey("");
+    setRememberApiKey(false);
+  }
+
   async function saveTextInput() {
     setSaveStatus("Saving study input...");
     try {
@@ -145,13 +200,13 @@ export function IntakeWorkspace() {
   }
 
   async function runTask() {
-    setTaskStatus("Working with Claude...");
+    setTaskStatus(`Working with ${providerId === "anthropic" ? "Anthropic" : "OpenAI"}...`);
     setTaskResult("");
     setFlashcards([]);
     try {
       const response = await fetch("/api/tasks/run", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...(apiKey ? { "x-polyglot-anthropic-key": apiKey } : {}) },
+        headers: { "Content-Type": "application/json", "x-polyglot-provider": providerId, ...(apiKey ? { "x-polyglot-api-key": apiKey } : {}) },
         body: JSON.stringify({ text, sourceLanguage, userLanguage: explanationLanguage, learnerLevel, outputStyle, promptTemplateId: selectedTemplate }),
       });
       const result = await parseJsonResponse<{ error?: string; result?: string; flashcards?: Flashcard[] }>(response);
@@ -263,10 +318,10 @@ export function IntakeWorkspace() {
               {taskResult && <section className="task-result" aria-label="Claude task result"><div className="result-label">Claude result · {explanationLanguage}</div>{flashcards.length ? <div className="flashcard-editor">{flashcards.map((card, index) => <article className="flashcard-edit" key={`${index}-${card.front}`}><label>Front<textarea value={card.front} onChange={(event) => setFlashcards((cards) => cards.map((item, itemIndex) => itemIndex === index ? { ...item, front: event.target.value } : item))} /></label><label>Back<textarea value={card.back} onChange={(event) => setFlashcards((cards) => cards.map((item, itemIndex) => itemIndex === index ? { ...item, back: event.target.value } : item))} /></label><label>Tags<input value={card.tags.join(", ")} onChange={(event) => setFlashcards((cards) => cards.map((item, itemIndex) => itemIndex === index ? { ...item, tags: event.target.value.split(",").map((tag) => tag.trim()).filter(Boolean) } : item))} /></label><button type="button" className="remove-card-button" aria-label={`Remove flashcard ${index + 1}`} onClick={() => setFlashcards((cards) => cards.filter((_, itemIndex) => itemIndex !== index))}>Remove</button></article>)}<button className="preview-prompt-button" type="button" onClick={() => setFlashcards((cards) => [...cards, { front: "", back: "", tags: [] }])}>Add card</button></div> : <div className="result-text">{taskResult}</div>}<div className="result-actions"><button className="save-input-button" type="button" disabled={!isWorkspaceKey(workspaceKey) || flashcards.some((card) => !card.front.trim() || !card.back.trim())} onClick={() => void saveForReview()}>Save for review</button>{reviewStatus && <span className="example-status" role="status">{reviewStatus}</span>}</div></section>}
             </>
           ) : (
-            <UploadPanel apiKey={apiKey} onTextExtracted={(extractedText, filename) => { setText(extractedText); setLoadedExample(`${filename} loaded`); setMode("text"); }} />
+            <UploadPanel apiKey={apiKey} providerId={providerId} onTextExtracted={(extractedText, filename) => { setText(extractedText); setLoadedExample(`${filename} loaded`); setMode("text"); }} />
           )}
         </div>
-        <LanguageSettings sourceLanguage={sourceLanguage} explanationLanguage={explanationLanguage} learnerLevel={learnerLevel} outputStyle={outputStyle} apiKey={apiKey} workspaceKey={workspaceKey} workspaceStatus={workspaceStatus} onSourceLanguageChange={(language) => { setSourceLanguage(language); if (language !== "Thai" && selectedTemplate === "thai-script-conversion") setSelectedTemplate("word-analysis"); }} onExplanationLanguageChange={setExplanationLanguage} onLearnerLevelChange={setLearnerLevel} onOutputStyleChange={setOutputStyle} onApiKeyChange={setApiKey} onWorkspaceKeyChange={setWorkspaceKey} onCopyWorkspaceKey={() => void copyWorkspaceKey()} onPresetChange={(source, explanation) => { setSourceLanguage(source); setExplanationLanguage(explanation); if (source !== "Thai" && selectedTemplate === "thai-script-conversion") setSelectedTemplate("word-analysis"); }} />
+        <LanguageSettings sourceLanguage={sourceLanguage} explanationLanguage={explanationLanguage} learnerLevel={learnerLevel} outputStyle={outputStyle} apiKey={apiKey} providerId={providerId} rememberApiKey={rememberApiKey} workspaceKey={workspaceKey} workspaceStatus={workspaceStatus} onSourceLanguageChange={(language) => { setSourceLanguage(language); if (language !== "Thai" && selectedTemplate === "thai-script-conversion") setSelectedTemplate("word-analysis"); }} onExplanationLanguageChange={setExplanationLanguage} onLearnerLevelChange={setLearnerLevel} onOutputStyleChange={setOutputStyle} onApiKeyChange={changeApiKey} onProviderChange={changeProvider} onRememberApiKeyChange={changeRememberApiKey} onForgetApiKey={forgetApiKey} onWorkspaceKeyChange={setWorkspaceKey} onCopyWorkspaceKey={() => void copyWorkspaceKey()} onPresetChange={(source, explanation) => { setSourceLanguage(source); setExplanationLanguage(explanation); if (source !== "Thai" && selectedTemplate === "thai-script-conversion") setSelectedTemplate("word-analysis"); }} />
       </section>
       <section className="template-section" aria-labelledby="template-title"><PromptTemplatePicker selectedTemplate={selectedTemplate} sourceLanguage={sourceLanguage} onTemplateChange={setSelectedTemplate} /></section>
       <SavedReview runs={reviewRuns} onOpen={openSavedRun} onUpdate={(run) => void updateSavedRun(run)} onDelete={(taskRunId) => void deleteSavedRun(taskRunId)} />

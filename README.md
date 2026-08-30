@@ -54,11 +54,11 @@ Do not commit `.env.local` or any real API key.
 
 ## Personal API keys
 
-The Language context panel includes an optional Anthropic API key field. A visitor can enter their own key to run study tasks and image/PDF OCR using their own Anthropic account.
+The Language context panel supports Anthropic and OpenAI. A visitor can select a provider and enter their own key to run study tasks using their own account. Image and scanned-PDF extraction currently requires Anthropic.
 
-The key is held only in the current React session. It is not written to local storage, saved reviews, text-input records, Vercel Blob, or source control. It is sent to the app server only with the immediate task or upload request. Closing or refreshing the page clears it.
+Keys are sent to the app server only with the immediate task or upload request. The **Remember on this device** option stores each provider's key in that browser's local storage, so a user can switch providers without re-entering keys. Remembered keys are never added to saved reviews, review sync, Vercel Blob, or source control. Leave the option unchecked for a session-only key, and use **Forget key** to remove the remembered key.
 
-When the field is blank, the app uses the server's `ANTHROPIC_API_KEY`. For a fully bring-your-own-key deployment, omit that environment variable; tasks that require Claude will ask the visitor to provide a key.
+The app requires a visitor-provided key for every LLM task and does not fall back to host-owned provider keys. This prevents shared visitors from using the host's provider account.
 
 ## Private review sync
 

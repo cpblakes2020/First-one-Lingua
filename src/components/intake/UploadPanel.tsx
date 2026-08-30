@@ -1,13 +1,15 @@
 "use client";
 
 import { useRef, useState } from "react";
+import type { LlmProviderId } from "@/lib/llm/provider";
 
 type UploadPanelProps = {
   onTextExtracted: (text: string, filename: string) => void;
   apiKey: string;
+  providerId: LlmProviderId;
 };
 
-export function UploadPanel({ onTextExtracted, apiKey }: UploadPanelProps) {
+export function UploadPanel({ onTextExtracted, apiKey, providerId }: UploadPanelProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState("");
   const [isUploading, setIsUploading] = useState(false);
@@ -23,7 +25,7 @@ export function UploadPanel({ onTextExtracted, apiKey }: UploadPanelProps) {
     formData.append("file", file);
 
     try {
-      const response = await fetch("/api/uploads", { method: "POST", headers: apiKey ? { "x-polyglot-anthropic-key": apiKey } : undefined, body: formData });
+      const response = await fetch("/api/uploads", { method: "POST", headers: { "x-polyglot-provider": providerId, ...(apiKey ? { "x-polyglot-api-key": apiKey } : {}) }, body: formData });
       const raw = await response.text();
       let result: { error?: string; text?: string; filename?: string; pageCount?: number };
       try {

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import path from "node:path";
 import { readFile } from "node:fs/promises";
 import { extractDocumentText } from "@/lib/extraction";
-import { getLlmProvider, getRequestApiKey } from "@/lib/llm/provider";
+import { getLlmProvider, getRequestApiKey, getRequestProvider } from "@/lib/llm/provider";
 import { storeDocument } from "@/lib/storage/filesystem";
 
 export const maxDuration = 60;
@@ -32,6 +32,7 @@ function getDocumentType(file: File) {
 export async function POST(request: Request) {
   try {
     const apiKey = getRequestApiKey(request);
+    const provider = getLlmProvider(getRequestProvider(request));
     const formData = await request.formData();
     const file = formData.get("file");
 
@@ -50,7 +51,8 @@ export async function POST(request: Request) {
     const source = await readFile(storedDocument.storagePath);
     let extracted = { text: "", pageCount: 1 };
     if (documentType === "image/jpeg" || documentType === "image/png") {
-      extracted.text = await getLlmProvider().extractText(source, documentType, apiKey);
+      if (!provider.extractText) return NextResponse.json({ error: "Image and scanned-PDF extraction currently requires an Anthropic API key." }, { status: 400 });
+      extracted.text = await provider.extractText(source, documentType, apiKey);
     } else {
       try {
         extracted = await extractDocumentText(storedDocument.storagePath, documentType);
@@ -58,7 +60,8 @@ export async function POST(request: Request) {
         if (documentType !== "application/pdf") throw error;
       }
       if (!extracted.text && documentType === "application/pdf") {
-        extracted.text = await getLlmProvider().extractText(source, documentType, apiKey);
+        if (!provider.extractText) return NextResponse.json({ error: "Scanned-PDF extraction currently requires an Anthropic API key." }, { status: 400 });
+        extracted.text = await provider.extractText(source, documentType, apiKey);
       }
     }
     if (!extracted.text) {

@@ -2,6 +2,7 @@
 
 import { languages, prioritizeLanguage } from "@/lib/languages";
 import { languagePairPresets } from "@/lib/presets";
+import { llmProviderOptions, type LlmProviderId } from "@/lib/llm/provider";
 import type { Language, LearnerLevel, OutputStyle } from "@/lib/types";
 
 type LanguageSettingsProps = {
@@ -10,6 +11,8 @@ type LanguageSettingsProps = {
   learnerLevel: LearnerLevel;
   outputStyle: OutputStyle;
   apiKey: string;
+  providerId: LlmProviderId;
+  rememberApiKey: boolean;
   workspaceKey: string;
   workspaceStatus: string;
   onSourceLanguageChange: (language: Language) => void;
@@ -17,6 +20,9 @@ type LanguageSettingsProps = {
   onLearnerLevelChange: (level: LearnerLevel) => void;
   onOutputStyleChange: (style: OutputStyle) => void;
   onApiKeyChange: (apiKey: string) => void;
+  onProviderChange: (providerId: LlmProviderId) => void;
+  onRememberApiKeyChange: (remember: boolean) => void;
+  onForgetApiKey: () => void;
   onWorkspaceKeyChange: (workspaceKey: string) => void;
   onCopyWorkspaceKey: () => void;
   onPresetChange: (sourceLanguage: Language, explanationLanguage: Language) => void;
@@ -28,6 +34,8 @@ export function LanguageSettings({
   learnerLevel,
   outputStyle,
   apiKey,
+  providerId,
+  rememberApiKey,
   workspaceKey,
   workspaceStatus,
   onSourceLanguageChange,
@@ -35,6 +43,9 @@ export function LanguageSettings({
   onLearnerLevelChange,
   onOutputStyleChange,
   onApiKeyChange,
+  onProviderChange,
+  onRememberApiKeyChange,
+  onForgetApiKey,
   onWorkspaceKeyChange,
   onCopyWorkspaceKey,
   onPresetChange,
@@ -64,9 +75,12 @@ export function LanguageSettings({
       <div className="setting-row"><label htmlFor="level">Learner level</label><select id="level" value={learnerLevel} onChange={(event) => onLearnerLevelChange(event.target.value as LearnerLevel)}><option>Beginner</option><option>Intermediate</option><option>Advanced</option></select></div>
       <div className="setting-row"><label htmlFor="style">Output style</label><select id="style" value={outputStyle} onChange={(event) => onOutputStyleChange(event.target.value as OutputStyle)}><option>Concise</option><option>Detailed</option><option>Literal</option><option>Natural</option><option>Formal</option><option>Informal</option></select></div>
       <div className="api-key-setting">
-        <label htmlFor="anthropic-api-key">Your Anthropic API key</label>
-        <input id="anthropic-api-key" type="password" value={apiKey} autoComplete="off" spellCheck={false} placeholder="Optional: use your own key" onChange={(event) => onApiKeyChange(event.target.value)} />
-        <p>This key is used only for this browser session and is never saved.</p>
+        <label htmlFor="llm-provider">Study provider</label>
+        <select id="llm-provider" value={providerId} onChange={(event) => onProviderChange(event.target.value as LlmProviderId)}>{llmProviderOptions.map((provider) => <option key={provider.id} value={provider.id}>{provider.label}</option>)}</select>
+        <label htmlFor="provider-api-key">Your {llmProviderOptions.find((provider) => provider.id === providerId)?.label} API key</label>
+        <input id="provider-api-key" type="password" value={apiKey} autoComplete="off" spellCheck={false} placeholder="Required to run tasks" onChange={(event) => onApiKeyChange(event.target.value)} />
+        <div className="remember-key-control"><label><input type="checkbox" checked={rememberApiKey} onChange={(event) => onRememberApiKeyChange(event.target.checked)} /> Remember on this device</label>{rememberApiKey && apiKey && <button type="button" onClick={onForgetApiKey}>Forget key</button>}</div>
+        <p>Keys stay in this browser only and are never included in review sync.</p>
       </div>
       <div className="workspace-sync-setting">
         <label htmlFor="workspace-sync-code">Private sync code</label>
