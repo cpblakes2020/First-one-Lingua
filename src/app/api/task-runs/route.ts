@@ -52,7 +52,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ taskRun }, { status: 201 });
   } catch (error) {
     console.error("saveTaskRun failed:", error);
-    const message = error instanceof Error ? error.message : "Unknown error";
-    return NextResponse.json({ error: `The result could not be saved. (${message})` }, { status: 500 });
+    return NextResponse.json({ error: "The result could not be saved." }, { status: 500 });
   }
 }
