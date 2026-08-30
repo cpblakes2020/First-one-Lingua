@@ -10,7 +10,7 @@ export async function storeTextInput(data: unknown): Promise<StoredTextInput> {
   const textInputId = randomUUID();
   const pathname = `lingua/text-inputs/${textInputId}.json`;
   await put(pathname, JSON.stringify(data, null, 2), {
-    access: "private",
+    access: "public",
     contentType: "application/json",
     addRandomSuffix: false,
   });
