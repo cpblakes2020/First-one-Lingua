@@ -1,15 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LanguageSettings } from "@/components/intake/LanguageSettings";
 import { PromptTemplatePicker } from "@/components/intake/PromptTemplatePicker";
 import { UploadPanel } from "@/components/intake/UploadPanel";
 import { SavedReview } from "@/components/review/SavedReview";
 import type { Flashcard } from "@/lib/flashcards";
-import type { SavedTaskRun } from "@/lib/storage/task-runs";
+import type { FollowUpExchange, SavedTaskRun } from "@/lib/storage/task-runs";
 import { createWorkspaceKey, decryptWorkspace, encryptWorkspace, isWorkspaceKey } from "@/lib/workspace-crypto";
 import type { LlmProviderId } from "@/lib/llm/provider";
 import type { Language, LearnerLevel, OutputStyle, PromptTemplateId } from "@/lib/types";
+
+const followUpPhrases = ["For this particular phrase", "What would be another way to say"];
 
 const examples = [
   { label: "Thai sentence", language: "Thai" as const, text: "พรุ่งนี้เราจะไปตลาดด้วยกัน" },
@@ -79,6 +81,12 @@ export function IntakeWorkspace() {
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [workspaceKey, setWorkspaceKey] = useState("");
   const [workspaceStatus, setWorkspaceStatus] = useState("Preparing private sync...");
+  const [followUps, setFollowUps] = useState<FollowUpExchange[]>([]);
+  const [showFollowUpForm, setShowFollowUpForm] = useState(false);
+  const [followUpText, setFollowUpText] = useState("");
+  const [followUpPreview, setFollowUpPreview] = useState("");
+  const [followUpStatus, setFollowUpStatus] = useState("");
+  const followUpTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     const savedWorkspaceKey = window.localStorage.getItem(workspaceKeyPreferenceKey);
@@ -203,6 +211,11 @@ export function IntakeWorkspace() {
     setTaskStatus(`Working with ${providerId === "anthropic" ? "Anthropic" : "OpenAI"}...`);
     setTaskResult("");
     setFlashcards([]);
+    setFollowUps([]);
+    setShowFollowUpForm(false);
+    setFollowUpText("");
+    setFollowUpPreview("");
+    setFollowUpStatus("");
     try {
       const response = await fetch("/api/tasks/run", {
         method: "POST",
@@ -222,7 +235,7 @@ export function IntakeWorkspace() {
   async function saveForReview() {
     setReviewStatus("Saving...");
     try {
-      const taskRun: SavedTaskRun = { taskRunId: crypto.randomUUID(), sourceText: text.trim(), result: taskResult.trim(), flashcards, sourceLanguage, userLanguage: explanationLanguage, learnerLevel, outputStyle, promptTemplateId: selectedTemplate, notes: "", createdAt: new Date().toISOString() };
+      const taskRun: SavedTaskRun = { taskRunId: crypto.randomUUID(), sourceText: text.trim(), result: taskResult.trim(), flashcards, followUps, sourceLanguage, userLanguage: explanationLanguage, learnerLevel, outputStyle, promptTemplateId: selectedTemplate, notes: "", createdAt: new Date().toISOString() };
       const runs = [taskRun, ...reviewRuns];
       await saveWorkspaceReviews(runs);
       setReviewRuns(runs);
@@ -241,6 +254,11 @@ export function IntakeWorkspace() {
     setSelectedTemplate(run.promptTemplateId);
     setTaskResult(run.result);
     setFlashcards(run.flashcards || []);
+    setFollowUps(run.followUps || []);
+    setShowFollowUpForm(false);
+    setFollowUpText("");
+    setFollowUpPreview("");
+    setFollowUpStatus("");
     setTaskStatus("Saved result opened");
     setReviewStatus("");
   }
@@ -292,6 +310,62 @@ export function IntakeWorkspace() {
     setTaskStatus("");
     setTaskResult("");
     setFlashcards([]);
+    setFollowUps([]);
+    setShowFollowUpForm(false);
+    setFollowUpText("");
+    setFollowUpPreview("");
+    setFollowUpStatus("");
+  }
+
+  function insertFollowUpPhrase(phrase: string) {
+    const textarea = followUpTextareaRef.current;
+    if (!textarea) {
+      setFollowUpText((value) => `${value}${phrase} `);
+      return;
+    }
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    setFollowUpText((value) => `${value.slice(0, start)}${phrase} ${value.slice(end)}`);
+    requestAnimationFrame(() => {
+      const cursor = start + phrase.length + 1;
+      textarea.focus();
+      textarea.setSelectionRange(cursor, cursor);
+    });
+  }
+
+  async function previewFollowUpPrompt() {
+    setFollowUpPreview("Building follow-up prompt...");
+    try {
+      const response = await fetch("/api/prompts/follow-up", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sourceText: text, previousResult: taskResult, question: followUpText, sourceLanguage, userLanguage: explanationLanguage, learnerLevel, outputStyle }),
+      });
+      const result = await parseJsonResponse<{ error?: string; prompt?: string }>(response);
+      if (!response.ok || !result.prompt) throw new Error(result.error || "The follow-up prompt could not be built.");
+      setFollowUpPreview(result.prompt);
+    } catch (error) {
+      setFollowUpPreview(error instanceof Error ? error.message : "The follow-up prompt could not be built.");
+    }
+  }
+
+  async function runFollowUpTask() {
+    setFollowUpStatus(`Working with ${providerId === "anthropic" ? "Anthropic" : "OpenAI"}...`);
+    try {
+      const response = await fetch("/api/tasks/follow-up", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-polyglot-provider": providerId, ...(apiKey ? { "x-polyglot-api-key": apiKey } : {}) },
+        body: JSON.stringify({ sourceText: text, previousResult: taskResult, question: followUpText, sourceLanguage, userLanguage: explanationLanguage, learnerLevel, outputStyle }),
+      });
+      const result = await parseJsonResponse<{ error?: string; result?: string }>(response);
+      if (!response.ok || !result.result) throw new Error(result.error || "The follow-up question could not be answered.");
+      setFollowUps((items) => [...items, { question: followUpText.trim(), answer: result.result!, createdAt: new Date().toISOString() }]);
+      setFollowUpText("");
+      setFollowUpPreview("");
+      setFollowUpStatus("Follow-up answered");
+    } catch (error) {
+      setFollowUpStatus(error instanceof Error ? error.message : "The follow-up question could not be answered.");
+    }
   }
 
   return (
@@ -315,7 +389,32 @@ export function IntakeWorkspace() {
               <div className="input-action-row"><button className="save-input-button" type="button" disabled={!text.trim()} onClick={() => void saveTextInput()}>Save study input</button><button className="preview-prompt-button" type="button" disabled={!text.trim()} onClick={() => void previewPrompt()}>Preview task prompt</button><button className="run-task-button" type="button" disabled={!text.trim() || taskStatus === "Working with Claude..."} onClick={() => void runTask()}>Run task</button>{saveStatus && <span className="example-status" role="status">{saveStatus}</span>}</div>
               {promptPreview && <pre className="prompt-preview" aria-label="Task prompt preview">{promptPreview}</pre>}
               {taskStatus && <p className="task-status" role="status">{taskStatus}</p>}
-              {taskResult && <section className="task-result" aria-label="Claude task result"><div className="result-label">Claude result · {explanationLanguage}</div>{flashcards.length ? <div className="flashcard-editor">{flashcards.map((card, index) => <article className="flashcard-edit" key={`${index}-${card.front}`}><label>Front<textarea value={card.front} onChange={(event) => setFlashcards((cards) => cards.map((item, itemIndex) => itemIndex === index ? { ...item, front: event.target.value } : item))} /></label><label>Back<textarea value={card.back} onChange={(event) => setFlashcards((cards) => cards.map((item, itemIndex) => itemIndex === index ? { ...item, back: event.target.value } : item))} /></label><label>Tags<input value={card.tags.join(", ")} onChange={(event) => setFlashcards((cards) => cards.map((item, itemIndex) => itemIndex === index ? { ...item, tags: event.target.value.split(",").map((tag) => tag.trim()).filter(Boolean) } : item))} /></label><button type="button" className="remove-card-button" aria-label={`Remove flashcard ${index + 1}`} onClick={() => setFlashcards((cards) => cards.filter((_, itemIndex) => itemIndex !== index))}>Remove</button></article>)}<button className="preview-prompt-button" type="button" onClick={() => setFlashcards((cards) => [...cards, { front: "", back: "", tags: [] }])}>Add card</button></div> : <div className="result-text">{taskResult}</div>}<div className="result-actions"><button className="save-input-button" type="button" disabled={!isWorkspaceKey(workspaceKey) || flashcards.some((card) => !card.front.trim() || !card.back.trim())} onClick={() => void saveForReview()}>Save for review</button>{reviewStatus && <span className="example-status" role="status">{reviewStatus}</span>}</div></section>}
+              {taskResult && <section className="task-result" aria-label="Claude task result"><div className="result-label">Claude result · {explanationLanguage}</div>{flashcards.length ? <div className="flashcard-editor">{flashcards.map((card, index) => <article className="flashcard-edit" key={`${index}-${card.front}`}><label>Front<textarea value={card.front} onChange={(event) => setFlashcards((cards) => cards.map((item, itemIndex) => itemIndex === index ? { ...item, front: event.target.value } : item))} /></label><label>Back<textarea value={card.back} onChange={(event) => setFlashcards((cards) => cards.map((item, itemIndex) => itemIndex === index ? { ...item, back: event.target.value } : item))} /></label><label>Tags<input value={card.tags.join(", ")} onChange={(event) => setFlashcards((cards) => cards.map((item, itemIndex) => itemIndex === index ? { ...item, tags: event.target.value.split(",").map((tag) => tag.trim()).filter(Boolean) } : item))} /></label><button type="button" className="remove-card-button" aria-label={`Remove flashcard ${index + 1}`} onClick={() => setFlashcards((cards) => cards.filter((_, itemIndex) => itemIndex !== index))}>Remove</button></article>)}<button className="preview-prompt-button" type="button" onClick={() => setFlashcards((cards) => [...cards, { front: "", back: "", tags: [] }])}>Add card</button></div> : <div className="result-text">{taskResult}</div>}<div className="result-actions"><button className="save-input-button" type="button" disabled={!isWorkspaceKey(workspaceKey) || flashcards.some((card) => !card.front.trim() || !card.back.trim())} onClick={() => void saveForReview()}>Save for review</button>{reviewStatus && <span className="example-status" role="status">{reviewStatus}</span>}</div>
+                <div className="follow-up-section">
+                  {followUps.map((item, index) => (
+                    <div className="follow-up-entry" key={`${index}-${item.createdAt}`}>
+                      <p className="follow-up-question"><strong>Q:</strong> {item.question}</p>
+                      <p className="follow-up-answer"><strong>A:</strong> {item.answer}</p>
+                    </div>
+                  ))}
+                  <button className="preview-prompt-button" type="button" onClick={() => setShowFollowUpForm((value) => !value)}>{showFollowUpForm ? "Close follow-up" : "Ask a follow-up question"}</button>
+                  {showFollowUpForm && (
+                    <div className="follow-up-form">
+                      <div className="example-row" aria-label="Insert a phrase">
+                        <span className="example-label">Insert a phrase</span>
+                        {followUpPhrases.map((phrase) => <button type="button" key={phrase} onClick={() => insertFollowUpPhrase(phrase)}>{phrase}</button>)}
+                      </div>
+                      <textarea ref={followUpTextareaRef} className="follow-up-textarea" value={followUpText} onChange={(event) => setFollowUpText(event.target.value)} placeholder="Ask about the result above..." />
+                      {followUpPreview && <pre className="prompt-preview" aria-label="Follow-up prompt preview">{followUpPreview}</pre>}
+                      <div className="input-action-row">
+                        <button className="preview-prompt-button" type="button" disabled={!followUpText.trim()} onClick={() => void previewFollowUpPrompt()}>Preview task prompt</button>
+                        <button className="run-task-button" type="button" disabled={!followUpText.trim() || followUpStatus.startsWith("Working with")} onClick={() => void runFollowUpTask()}>Run task</button>
+                        {followUpStatus && <span className="example-status" role="status">{followUpStatus}</span>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </section>}
             </>
           ) : (
             <UploadPanel apiKey={apiKey} providerId={providerId} onTextExtracted={(extractedText, filename) => { setText(extractedText); setLoadedExample(`${filename} loaded`); setMode("text"); }} />

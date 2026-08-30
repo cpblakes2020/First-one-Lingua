@@ -100,6 +100,12 @@ h2 { margin-bottom: 0; color: var(--ink); font-family: Georgia, serif; font-size
 .flashcard-edit textarea { min-height: 78px; resize: vertical; }
 .flashcard-edit label:last-of-type { grid-column: 1 / -1; }
 .remove-card-button { justify-self: start; border: 0; background: transparent; color: #a54c3e; font-size: 10px; }
+.follow-up-section { border-top: 1px solid var(--line); padding: 14px; }
+.follow-up-entry { margin-bottom: 12px; }
+.follow-up-question, .follow-up-answer { margin: 0 0 4px; color: var(--ink); font-size: 12px; line-height: 1.6; }
+.follow-up-question strong, .follow-up-answer strong { color: var(--teal); }
+.follow-up-form { margin-top: 12px; }
+.follow-up-textarea { display: block; width: 100%; min-height: 90px; resize: vertical; border: 1px solid var(--line); background: #f3f1e7; margin-top: 10px; padding: 12px; color: var(--ink); font-size: 13px; line-height: 1.5; }
 .result-actions { display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--line); padding: 12px 14px; }
 .review-section { border-top: 1px solid var(--line); padding: 46px 0 36px; }
 .review-list { display: grid; gap: 8px; }

@@ -1,5 +1,5 @@
-import { runClaudeTask, extractTextWithClaude } from "@/lib/llm/claude";
-import { extractTextWithOpenAi, runOpenAiTask } from "@/lib/llm/openai";
+import { extractTextWithClaude, runClaudeRawPrompt, runClaudeTask } from "@/lib/llm/claude";
+import { extractTextWithOpenAi, runOpenAiRawPrompt, runOpenAiTask } from "@/lib/llm/openai";
 import type { Language, LearnerLevel, OutputStyle, PromptTemplateId } from "@/lib/types";
 
 export type LlmProviderId = "anthropic" | "openai";
@@ -20,16 +20,19 @@ export type LlmTaskInput = {
 
 export type LlmProvider = {
   runTask: (input: LlmTaskInput, apiKey?: string) => Promise<string>;
+  runRawPrompt?: (prompt: string, apiKey?: string) => Promise<string>;
   extractText?: (source: Buffer, mimeType: string, apiKey?: string) => Promise<string>;
 };
 
 const providers: Record<LlmProviderId, LlmProvider> = {
   anthropic: {
     runTask: runClaudeTask,
+    runRawPrompt: runClaudeRawPrompt,
     extractText: extractTextWithClaude,
   },
   openai: {
     runTask: runOpenAiTask,
+    runRawPrompt: runOpenAiRawPrompt,
     extractText: extractTextWithOpenAi,
   },
 };

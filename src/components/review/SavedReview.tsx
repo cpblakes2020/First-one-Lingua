@@ -37,6 +37,16 @@ export function SavedReview({ runs, onOpen, onUpdate, onDelete }: SavedReviewPro
                   <textarea className="review-detail-text" readOnly value={run.sourceText} />
                   <label className="text-label">Result</label>
                   <textarea className="review-detail-text" readOnly value={run.result} />
+                  {run.followUps && run.followUps.length > 0 && (
+                    <div className="follow-up-section">
+                      {run.followUps.map((item, index) => (
+                        <div className="follow-up-entry" key={`${index}-${item.createdAt}`}>
+                          <p className="follow-up-question"><strong>Q:</strong> {item.question}</p>
+                          <p className="follow-up-answer"><strong>A:</strong> {item.answer}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <button type="button" onClick={() => onOpen(run)}>Open in workspace to edit</button>
                 </div>
               )}

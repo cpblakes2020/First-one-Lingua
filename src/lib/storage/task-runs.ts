@@ -5,6 +5,12 @@ import type { Language, LearnerLevel, OutputStyle, PromptTemplateId } from "@/li
 
 const blobPathname = "lingua/task-runs.json";
 
+export type FollowUpExchange = {
+  question: string;
+  answer: string;
+  createdAt: string;
+};
+
 export type SavedTaskRun = {
   taskRunId: string;
   sourceText: string;
@@ -15,6 +21,7 @@ export type SavedTaskRun = {
   promptTemplateId: PromptTemplateId;
   result: string;
   flashcards?: Flashcard[];
+  followUps?: FollowUpExchange[];
   notes: string;
   createdAt: string;
 };
