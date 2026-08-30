@@ -1,9 +1,11 @@
 import { mkdir, readFile, readdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
+import os from "node:os";
 import { randomUUID } from "node:crypto";
 import type { Language, LearnerLevel, OutputStyle, PromptTemplateId } from "@/lib/types";
 
-const storageRoot = path.join(process.cwd(), ".lingua-storage", "task-runs");
+// process.cwd() is read-only on Vercel serverless; only os.tmpdir() is writable there.
+const storageRoot = path.join(os.tmpdir(), "lingua-storage", "task-runs");
 
 export type SavedTaskRun = {
   taskRunId: string;

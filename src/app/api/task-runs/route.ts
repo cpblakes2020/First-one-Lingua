@@ -8,7 +8,11 @@ const learnerLevels = new Set<LearnerLevel>(["Beginner", "Intermediate", "Advanc
 const outputStyles = new Set<OutputStyle>(["Concise", "Detailed", "Literal", "Natural", "Formal", "Informal"]);
 
 export async function GET() {
-  return NextResponse.json({ taskRuns: await listTaskRuns() });
+  try {
+    return NextResponse.json({ taskRuns: await listTaskRuns() });
+  } catch {
+    return NextResponse.json({ error: "Saved reviews could not be loaded." }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {
@@ -34,15 +38,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Choose a supported prompt template." }, { status: 400 });
   }
 
-  const taskRun = await saveTaskRun({
-    sourceText: sourceText.trim(),
-    result: result.trim(),
-    notes: "",
-    sourceLanguage,
-    userLanguage,
-    learnerLevel: learnerLevel as LearnerLevel,
-    outputStyle: outputStyle as OutputStyle,
-    promptTemplateId: promptTemplateId as PromptTemplateId,
-  });
-  return NextResponse.json({ taskRun }, { status: 201 });
+  try {
+    const taskRun = await saveTaskRun({
+      sourceText: sourceText.trim(),
+      result: result.trim(),
+      notes: "",
+      sourceLanguage,
+      userLanguage,
+      learnerLevel: learnerLevel as LearnerLevel,
+      outputStyle: outputStyle as OutputStyle,
+      promptTemplateId: promptTemplateId as PromptTemplateId,
+    });
+    return NextResponse.json({ taskRun }, { status: 201 });
+  } catch {
+    return NextResponse.json({ error: "The result could not be saved." }, { status: 500 });
+  }
 }

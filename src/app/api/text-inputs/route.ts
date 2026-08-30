@@ -43,15 +43,18 @@ export async function POST(request: Request) {
   }
 
   const createdAt = new Date().toISOString();
-  const stored = await storeTextInput({
-    rawInputText: body.text.trim(),
-    sourceLanguage: body.sourceLanguage,
-    userLanguage: body.userLanguage,
-    learnerLevel: body.learnerLevel,
-    outputStyle: body.outputStyle,
-    sourceLanguageConfirmed: true,
-    createdAt,
-  });
-
-  return NextResponse.json({ textInputId: stored.textInputId, createdAt }, { status: 201 });
+  try {
+    const stored = await storeTextInput({
+      rawInputText: body.text.trim(),
+      sourceLanguage: body.sourceLanguage,
+      userLanguage: body.userLanguage,
+      learnerLevel: body.learnerLevel,
+      outputStyle: body.outputStyle,
+      sourceLanguageConfirmed: true,
+      createdAt,
+    });
+    return NextResponse.json({ textInputId: stored.textInputId, createdAt }, { status: 201 });
+  } catch {
+    return NextResponse.json({ error: "The study input could not be saved." }, { status: 500 });
+  }
 }

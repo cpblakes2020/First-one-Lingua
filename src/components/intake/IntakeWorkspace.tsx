@@ -14,6 +14,15 @@ const examples = [
   { label: "Indonesian affix", language: "Indonesian" as const, text: "berjalan" },
 ];
 
+async function parseJsonResponse<T>(response: Response): Promise<T> {
+  const raw = await response.text();
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    throw new Error(`Server error (${response.status}). Please try again.`);
+  }
+}
+
 export function IntakeWorkspace() {
   const [mode, setMode] = useState<"text" | "document">("text");
   const [text, setText] = useState("");
@@ -51,7 +60,7 @@ export function IntakeWorkspace() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text, sourceLanguage, userLanguage: explanationLanguage, learnerLevel, outputStyle }),
       });
-      const result = await response.json() as { error?: string; textInputId?: string };
+      const result = await parseJsonResponse<{ error?: string; textInputId?: string }>(response);
       if (!response.ok || !result.textInputId) throw new Error(result.error || "The study input could not be saved.");
       setSaveStatus("Study input saved");
     } catch (error) {
@@ -67,7 +76,7 @@ export function IntakeWorkspace() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text, sourceLanguage, userLanguage: explanationLanguage, learnerLevel, outputStyle, promptTemplateId: selectedTemplate }),
       });
-      const result = await response.json() as { error?: string; prompt?: string };
+      const result = await parseJsonResponse<{ error?: string; prompt?: string }>(response);
       if (!response.ok || !result.prompt) throw new Error(result.error || "The prompt could not be built.");
       setPromptPreview(result.prompt);
     } catch (error) {
@@ -84,7 +93,7 @@ export function IntakeWorkspace() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text, sourceLanguage, userLanguage: explanationLanguage, learnerLevel, outputStyle, promptTemplateId: selectedTemplate }),
       });
-      const result = await response.json() as { error?: string; result?: string };
+      const result = await parseJsonResponse<{ error?: string; result?: string }>(response);
       if (!response.ok || !result.result) throw new Error(result.error || "The task could not be completed.");
       setTaskResult(result.result);
       setTaskStatus("Task complete");
@@ -101,7 +110,7 @@ export function IntakeWorkspace() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sourceText: text, result: taskResult, sourceLanguage, userLanguage: explanationLanguage, learnerLevel, outputStyle, promptTemplateId: selectedTemplate }),
       });
-      const data = await response.json() as { error?: string; taskRun?: SavedTaskRun };
+      const data = await parseJsonResponse<{ error?: string; taskRun?: SavedTaskRun }>(response);
       if (!response.ok || !data.taskRun) throw new Error(data.error || "The result could not be saved.");
       setReviewRuns((runs) => [data.taskRun!, ...runs]);
       setReviewStatus("Saved for review");
