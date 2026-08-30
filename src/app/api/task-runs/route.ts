@@ -50,7 +50,9 @@ export async function POST(request: Request) {
       promptTemplateId: promptTemplateId as PromptTemplateId,
     });
     return NextResponse.json({ taskRun }, { status: 201 });
-  } catch {
-    return NextResponse.json({ error: "The result could not be saved." }, { status: 500 });
+  } catch (error) {
+    console.error("saveTaskRun failed:", error);
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ error: `The result could not be saved. (${message})` }, { status: 500 });
   }
 }
