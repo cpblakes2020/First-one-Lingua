@@ -1,11 +1,8 @@
-import { mkdir, readFile, readdir, unlink, writeFile } from "node:fs/promises";
-import path from "node:path";
-import os from "node:os";
 import { randomUUID } from "node:crypto";
+import { readJsonBlob, writeJsonBlob } from "@/lib/storage/blob-json";
 import type { Language, LearnerLevel, OutputStyle, PromptTemplateId } from "@/lib/types";
 
-// process.cwd() is read-only on Vercel serverless; only os.tmpdir() is writable there.
-const storageRoot = path.join(os.tmpdir(), "lingua-storage", "task-runs");
+const blobPathname = "lingua/task-runs.json";
 
 export type SavedTaskRun = {
   taskRunId: string;
@@ -20,28 +17,41 @@ export type SavedTaskRun = {
   createdAt: string;
 };
 
+async function readAll(): Promise<SavedTaskRun[]> {
+  return readJsonBlob<SavedTaskRun[]>(blobPathname, []);
+}
+
+async function writeAll(taskRuns: SavedTaskRun[]): Promise<void> {
+  await writeJsonBlob(blobPathname, taskRuns);
+}
+
 export async function saveTaskRun(input: Omit<SavedTaskRun, "taskRunId" | "createdAt">) {
   const taskRun: SavedTaskRun = { ...input, taskRunId: randomUUID(), createdAt: new Date().toISOString() };
-  await mkdir(storageRoot, { recursive: true });
-  await writeFile(path.join(storageRoot, `${taskRun.taskRunId}.json`), JSON.stringify(taskRun, null, 2), "utf8");
+  const taskRuns = await readAll();
+  taskRuns.push(taskRun);
+  await writeAll(taskRuns);
   return taskRun;
 }
 
 export async function updateTaskRunNotes(taskRunId: string, notes: string) {
-  const filePath = path.join(storageRoot, `${taskRunId}.json`);
-  const taskRun = JSON.parse(await readFile(filePath, "utf8")) as SavedTaskRun;
-  const updatedTaskRun = { ...taskRun, notes };
-  await writeFile(filePath, JSON.stringify(updatedTaskRun, null, 2), "utf8");
+  const taskRuns = await readAll();
+  const index = taskRuns.findIndex((taskRun) => taskRun.taskRunId === taskRunId);
+  if (index === -1) throw new Error("Saved review item was not found.");
+  const updatedTaskRun = { ...taskRuns[index], notes };
+  taskRuns[index] = updatedTaskRun;
+  await writeAll(taskRuns);
   return updatedTaskRun;
 }
 
 export async function deleteTaskRun(taskRunId: string) {
-  await unlink(path.join(storageRoot, `${taskRunId}.json`));
+  const taskRuns = await readAll();
+  const remaining = taskRuns.filter((taskRun) => taskRun.taskRunId !== taskRunId);
+  if (remaining.length === taskRuns.length) throw new Error("Saved review item was not found.");
+  await writeAll(remaining);
 }
 
 export async function listTaskRuns() {
-  await mkdir(storageRoot, { recursive: true });
-  const filenames = await readdir(storageRoot);
-  const runs = await Promise.all(filenames.filter((filename) => filename.endsWith(".json")).map(async (filename) => JSON.parse(await readFile(path.join(storageRoot, filename), "utf8")) as SavedTaskRun));
-  return runs.sort((first, second) => second.createdAt.localeCompare(first.createdAt));
+  const taskRuns = await readAll();
+  return taskRuns.sort((first, second) => second.createdAt.localeCompare(first.createdAt));
 }
+
