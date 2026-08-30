@@ -12,6 +12,10 @@ export function UploadPanel({ onTextExtracted }: UploadPanelProps) {
   const [isUploading, setIsUploading] = useState(false);
 
   async function uploadFile(file: File) {
+    if (file.size > 4 * 1024 * 1024) {
+      setStatus("Files must be under 4 MB. Try a smaller scan or lower resolution.");
+      return;
+    }
     setIsUploading(true);
     setStatus(`Reading ${file.name}...`);
     const formData = new FormData();

@@ -7,7 +7,9 @@ import { storeDocument } from "@/lib/storage/filesystem";
 
 export const maxDuration = 60;
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
+// Vercel's Node.js serverless functions hard-reject request bodies over 4.5 MB
+// before our code even runs, so keep our own limit safely under that.
+const MAX_FILE_SIZE = 4 * 1024 * 1024;
 const docxMimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const supportedTypes = new Set(["text/html", "text/plain", "text/xml", "application/xml", "application/pdf", docxMimeType, "image/jpeg", "image/png"]);
 const supportedExtensions = new Set([".html", ".htm", ".txt", ".xml", ".pdf", ".docx", ".jpg", ".jpeg", ".png"]);
@@ -40,7 +42,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Only HTML, text, XML, DOCX, and extractable PDF files are supported right now." }, { status: 415 });
     }
     if (file.size === 0 || file.size > MAX_FILE_SIZE) {
-      return NextResponse.json({ error: "Files must be between 1 byte and 10 MB." }, { status: 413 });
+      return NextResponse.json({ error: "Files must be between 1 byte and 4 MB." }, { status: 413 });
     }
 
     const storedDocument = await storeDocument(file);
