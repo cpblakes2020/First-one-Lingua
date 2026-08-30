@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import "pdf-parse/worker"; // must load before pdf-parse for worker to resolve on serverless
 import { PDFParse } from "pdf-parse";
 import mammoth from "mammoth";
 
