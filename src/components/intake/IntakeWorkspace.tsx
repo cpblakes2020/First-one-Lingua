@@ -23,11 +23,28 @@ async function parseJsonResponse<T>(response: Response): Promise<T> {
   }
 }
 
+const languagePreferenceKey = "lingua:languagePreference";
+const defaultSourceLanguage: Language = "Indonesian";
+const defaultExplanationLanguage: Language = "English";
+
+function loadLanguagePreference(): { sourceLanguage: Language; explanationLanguage: Language } {
+  if (typeof window === "undefined") return { sourceLanguage: defaultSourceLanguage, explanationLanguage: defaultExplanationLanguage };
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(languagePreferenceKey) || "null") as { sourceLanguage?: Language; explanationLanguage?: Language } | null;
+    return {
+      sourceLanguage: stored?.sourceLanguage || defaultSourceLanguage,
+      explanationLanguage: stored?.explanationLanguage || defaultExplanationLanguage,
+    };
+  } catch {
+    return { sourceLanguage: defaultSourceLanguage, explanationLanguage: defaultExplanationLanguage };
+  }
+}
+
 export function IntakeWorkspace() {
   const [mode, setMode] = useState<"text" | "document">("text");
   const [text, setText] = useState("");
-  const [sourceLanguage, setSourceLanguage] = useState<Language>("Japanese");
-  const [explanationLanguage, setExplanationLanguage] = useState<Language>("Thai");
+  const [sourceLanguage, setSourceLanguage] = useState<Language>(defaultSourceLanguage);
+  const [explanationLanguage, setExplanationLanguage] = useState<Language>(defaultExplanationLanguage);
   const [learnerLevel, setLearnerLevel] = useState<LearnerLevel>("Intermediate");
   const [outputStyle, setOutputStyle] = useState<OutputStyle>("Detailed");
   const [selectedTemplate, setSelectedTemplate] = useState<PromptTemplateId>("word-analysis");
@@ -42,6 +59,16 @@ export function IntakeWorkspace() {
   useEffect(() => {
     void fetch("/api/task-runs").then((response) => response.json()).then((data: { taskRuns?: SavedTaskRun[] }) => setReviewRuns(data.taskRuns || [])).catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    const preference = loadLanguagePreference();
+    setSourceLanguage(preference.sourceLanguage);
+    setExplanationLanguage(preference.explanationLanguage);
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(languagePreferenceKey, JSON.stringify({ sourceLanguage, explanationLanguage }));
+  }, [sourceLanguage, explanationLanguage]);
 
   function loadExample(example: (typeof examples)[number]) {
     setText(example.text);
