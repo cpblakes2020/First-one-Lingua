@@ -1,8 +1,10 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import os from "node:os";
 import { randomUUID } from "node:crypto";
 
-const storageRoot = path.join(process.cwd(), ".lingua-storage", "documents");
+// process.cwd() is read-only on Vercel serverless; only os.tmpdir() is writable there.
+const storageRoot = path.join(os.tmpdir(), "lingua-storage", "documents");
 
 export type StoredDocument = {
   documentId: string;

@@ -28,21 +28,21 @@ function getDocumentType(file: File) {
 }
 
 export async function POST(request: Request) {
-  const formData = await request.formData();
-  const file = formData.get("file");
-
-  if (!(file instanceof File)) {
-    return NextResponse.json({ error: "Choose an HTML, text, XML, DOCX, or PDF file to upload." }, { status: 400 });
-  }
-  const documentType = getDocumentType(file);
-  if (!documentType) {
-    return NextResponse.json({ error: "Only HTML, text, XML, DOCX, and extractable PDF files are supported right now." }, { status: 415 });
-  }
-  if (file.size === 0 || file.size > MAX_FILE_SIZE) {
-    return NextResponse.json({ error: "Files must be between 1 byte and 10 MB." }, { status: 413 });
-  }
-
   try {
+    const formData = await request.formData();
+    const file = formData.get("file");
+
+    if (!(file instanceof File)) {
+      return NextResponse.json({ error: "Choose an HTML, text, XML, DOCX, or PDF file to upload." }, { status: 400 });
+    }
+    const documentType = getDocumentType(file);
+    if (!documentType) {
+      return NextResponse.json({ error: "Only HTML, text, XML, DOCX, and extractable PDF files are supported right now." }, { status: 415 });
+    }
+    if (file.size === 0 || file.size > MAX_FILE_SIZE) {
+      return NextResponse.json({ error: "Files must be between 1 byte and 10 MB." }, { status: 413 });
+    }
+
     const storedDocument = await storeDocument(file);
     const source = await readFile(storedDocument.storagePath);
     let extracted = { text: "", pageCount: 1 };
