@@ -46,8 +46,8 @@ ANTHROPIC_MODEL=claude-sonnet-4-5
 BLOB_READ_WRITE_TOKEN=vercel_blob_read_write_token
 
 # Required for encrypted private review sync. Vercel injects this when the
-# private Blob store is connected; a PRIVATE_SYNC_ prefixed equivalent also works.
-PRIVATE_SYNC_BLOB_READ_WRITE_TOKEN=vercel_private_blob_read_write_token
+# private Blob store is connected with the PRIVATE_SYNC_ prefix.
+PRIVATE_SYNC__STORE_ID=store_private_blob_store_id
 ```
 
 Do not commit `.env.local` or any real API key.
@@ -72,7 +72,7 @@ Provider API keys are deliberately device-local and are not part of private revi
 
 ## Storage and uploads
 
-Encrypted saved reviews are stored in private Vercel Blob objects using `BLOB_READ_WRITE_TOKEN` or `PRIVATE_SYNC_BLOB_READ_WRITE_TOKEN`. The configured private Blob store must permit the application's token to read and write them.
+Encrypted saved reviews are stored in private Vercel Blob objects using `PRIVATE_SYNC__STORE_ID` and Vercel's automatically managed deployment credential. The configured private Blob store must be connected to the project in Vercel.
 
 Uploaded documents are written temporarily to the server's temporary directory while text is extracted. They are not retained as user documents after the request completes. Text-based files are extracted locally; images and scanned PDFs without usable embedded text are sent to Claude for transcription.
 
