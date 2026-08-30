@@ -42,8 +42,12 @@ ANTHROPIC_API_KEY=your_anthropic_api_key
 # Optional. Defaults to claude-sonnet-4-5.
 ANTHROPIC_MODEL=claude-sonnet-4-5
 
-# Required for persisted text inputs and saved reviews on Vercel.
+# Required for legacy persisted text inputs on Vercel.
 BLOB_READ_WRITE_TOKEN=vercel_blob_read_write_token
+
+# Required for encrypted private review sync. This is injected by the private
+# Blob store connection that uses the PRIVATE_SYNC_ variable prefix.
+PRIVATE_SYNC_BLOB_READ_WRITE_TOKEN=vercel_private_blob_read_write_token
 ```
 
 Do not commit `.env.local` or any real API key.
@@ -68,7 +72,7 @@ Provider API keys are deliberately device-local and are not part of private revi
 
 ## Storage and uploads
 
-Encrypted saved reviews are stored in private Vercel Blob objects. The configured Blob store must permit the application's token to read and write them.
+Encrypted saved reviews are stored in private Vercel Blob objects using `PRIVATE_SYNC_BLOB_READ_WRITE_TOKEN`. The configured private Blob store must permit the application's token to read and write them.
 
 Uploaded documents are written temporarily to the server's temporary directory while text is extracted. They are not retained as user documents after the request completes. Text-based files are extracted locally; images and scanned PDFs without usable embedded text are sent to Claude for transcription.
 

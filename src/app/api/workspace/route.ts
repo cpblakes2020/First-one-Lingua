@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
-import { readJsonBlob, writeJsonBlob } from "@/lib/storage/blob-json";
+import { readPrivateWorkspace, writePrivateWorkspace } from "@/lib/storage/private-workspace";
 
 const workspaceKeyHeader = "x-polyglot-workspace-key";
 const maxPayloadLength = 5 * 1024 * 1024;
@@ -16,7 +16,7 @@ export async function GET(request: Request) {
   const pathname = workspacePath(request);
   if (!pathname) return NextResponse.json({ error: "Enter a valid sync code." }, { status: 400 });
   try {
-    const payload = await readJsonBlob<string | null>(pathname, null);
+    const payload = await readPrivateWorkspace(pathname);
     return NextResponse.json({ payload });
   } catch {
     return NextResponse.json({ error: "Private sync is unavailable. Configure Vercel Blob for this deployment." }, { status: 503 });
@@ -31,7 +31,7 @@ export async function PUT(request: Request) {
     if (typeof body?.payload !== "string" || !body.payload || body.payload.length > maxPayloadLength) {
       return NextResponse.json({ error: "The encrypted workspace payload is invalid." }, { status: 400 });
     }
-    await writeJsonBlob(pathname, body.payload);
+    await writePrivateWorkspace(pathname, body.payload);
     return NextResponse.json({ saved: true });
   } catch {
     return NextResponse.json({ error: "Private sync is unavailable. Configure Vercel Blob for this deployment." }, { status: 503 });
