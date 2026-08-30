@@ -1,6 +1,6 @@
 import { get, put } from "@vercel/blob";
 
-const privateSyncToken = process.env.PRIVATE_SYNC_BLOB_READ_WRITE_TOKEN;
+const privateSyncToken = process.env.PRIVATE_SYNC_BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN;
 
 function requirePrivateSyncToken() {
   if (!privateSyncToken) throw new Error("Private sync is not configured.");
