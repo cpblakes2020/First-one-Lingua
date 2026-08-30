@@ -54,7 +54,7 @@ Do not commit `.env.local` or any real API key.
 
 ## Personal API keys
 
-The Language context panel supports Anthropic and OpenAI. A visitor can select a provider and enter their own key to run study tasks using their own account. Image and scanned-PDF extraction currently requires Anthropic.
+The Language context panel supports Anthropic and OpenAI. A visitor can select a provider and enter their own key to run study tasks using their own account. Both providers can transcribe JPG and PNG images. Scanned-PDF extraction currently requires Anthropic.
 
 Keys are sent to the app server only with the immediate task or upload request. The **Remember on this device** option stores each provider's key in that browser's local storage, so a user can switch providers without re-entering keys. Remembered keys are never added to saved reviews, review sync, Vercel Blob, or source control. Leave the option unchecked for a session-only key, and use **Forget key** to remove the remembered key.
 
@@ -74,7 +74,7 @@ Provider API keys are deliberately device-local and are not part of private revi
 
 Encrypted saved reviews are stored in private Vercel Blob objects using `PRIVATE_SYNC__STORE_ID` and Vercel's automatically managed deployment credential. The configured private Blob store must be connected to the project in Vercel.
 
-Uploaded documents are written temporarily to the server's temporary directory while text is extracted. They are not retained as user documents after the request completes. Text-based files are extracted locally; images and scanned PDFs without usable embedded text are sent to Claude for transcription.
+Uploaded documents are written temporarily to the server's temporary directory while text is extracted. They are not retained as user documents after the request completes. Text-based files are extracted locally; images are sent to the selected provider for transcription, and scanned PDFs without usable embedded text are sent to Anthropic.
 
 ## Anki exports
 

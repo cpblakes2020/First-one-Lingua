@@ -1,5 +1,5 @@
 import { runClaudeTask, extractTextWithClaude } from "@/lib/llm/claude";
-import { runOpenAiTask } from "@/lib/llm/openai";
+import { extractTextWithOpenAi, runOpenAiTask } from "@/lib/llm/openai";
 import type { Language, LearnerLevel, OutputStyle, PromptTemplateId } from "@/lib/types";
 
 export type LlmProviderId = "anthropic" | "openai";
@@ -30,6 +30,7 @@ const providers: Record<LlmProviderId, LlmProvider> = {
   },
   openai: {
     runTask: runOpenAiTask,
+    extractText: extractTextWithOpenAi,
   },
 };
 

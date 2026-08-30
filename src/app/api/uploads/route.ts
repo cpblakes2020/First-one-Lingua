@@ -51,7 +51,7 @@ export async function POST(request: Request) {
     const source = await readFile(storedDocument.storagePath);
     let extracted = { text: "", pageCount: 1 };
     if (documentType === "image/jpeg" || documentType === "image/png") {
-      if (!provider.extractText) return NextResponse.json({ error: "Image and scanned-PDF extraction currently requires an Anthropic API key." }, { status: 400 });
+      if (!provider.extractText) return NextResponse.json({ error: "Image extraction is unavailable for the selected provider." }, { status: 400 });
       extracted.text = await provider.extractText(source, documentType, apiKey);
     } else {
       try {
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
         if (documentType !== "application/pdf") throw error;
       }
       if (!extracted.text && documentType === "application/pdf") {
-        if (!provider.extractText) return NextResponse.json({ error: "Scanned-PDF extraction currently requires an Anthropic API key." }, { status: 400 });
+        if (getRequestProvider(request) !== "anthropic" || !provider.extractText) return NextResponse.json({ error: "Scanned-PDF extraction currently requires an Anthropic API key." }, { status: 400 });
         extracted.text = await provider.extractText(source, documentType, apiKey);
       }
     }
