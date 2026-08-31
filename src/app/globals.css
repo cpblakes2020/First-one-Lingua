@@ -106,6 +106,13 @@ h2 { margin-bottom: 0; color: var(--ink); font-family: Georgia, serif; font-size
 .follow-up-question strong, .follow-up-answer strong { color: var(--teal); }
 .follow-up-form { margin-top: 12px; }
 .follow-up-textarea { display: block; width: 100%; min-height: 90px; resize: vertical; border: 1px solid var(--line); background: #f3f1e7; margin-top: 10px; padding: 12px; color: var(--ink); font-size: 13px; line-height: 1.5; }
+.workspace-setup { max-width: 520px; margin: 70px auto; border: 1px solid var(--line); background: var(--paper); padding: 32px; }
+.workspace-setup p { color: #56645d; font-size: 13px; line-height: 1.6; }
+.workspace-setup-form { margin-top: 18px; }
+.workspace-setup-form label { display: block; margin-bottom: 7px; color: var(--muted); font-size: 11px; }
+.workspace-setup-form input { width: 100%; border: 1px solid var(--line); background: #f3f1e7; padding: 10px; color: var(--ink); font-family: var(--font-geist-mono), monospace; font-size: 12px; }
+.workspace-setup-error { color: #a54c3e; }
+.workspace-setup-actions { display: flex; gap: 12px; margin-top: 18px; }
 .result-actions { display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--line); padding: 12px 14px; }
 .review-section { border-top: 1px solid var(--line); padding: 46px 0 36px; }
 .review-list { display: grid; gap: 8px; }

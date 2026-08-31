@@ -87,12 +87,18 @@ export function IntakeWorkspace() {
   const [followUpPreview, setFollowUpPreview] = useState("");
   const [followUpStatus, setFollowUpStatus] = useState("");
   const followUpTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const [needsWorkspaceSetup, setNeedsWorkspaceSetup] = useState(false);
+  const [showWorkspaceCodeInput, setShowWorkspaceCodeInput] = useState(false);
+  const [workspaceSetupInput, setWorkspaceSetupInput] = useState("");
+  const [workspaceSetupError, setWorkspaceSetupError] = useState("");
 
   useEffect(() => {
     const savedWorkspaceKey = window.localStorage.getItem(workspaceKeyPreferenceKey);
-    const nextWorkspaceKey = savedWorkspaceKey && isWorkspaceKey(savedWorkspaceKey) ? savedWorkspaceKey : createWorkspaceKey();
-    window.localStorage.setItem(workspaceKeyPreferenceKey, nextWorkspaceKey);
-    setWorkspaceKey(nextWorkspaceKey);
+    if (savedWorkspaceKey && isWorkspaceKey(savedWorkspaceKey)) {
+      setWorkspaceKey(savedWorkspaceKey);
+      return;
+    }
+    setNeedsWorkspaceSetup(true);
   }, []);
 
   useEffect(() => {
@@ -302,6 +308,27 @@ export function IntakeWorkspace() {
     }
   }
 
+  function useExistingWorkspaceCode() {
+    const trimmed = workspaceSetupInput.trim();
+    if (!isWorkspaceKey(trimmed)) {
+      setWorkspaceSetupError("Enter the 43-character sync code exactly as saved.");
+      return;
+    }
+    window.localStorage.setItem(workspaceKeyPreferenceKey, trimmed);
+    setWorkspaceKey(trimmed);
+    setNeedsWorkspaceSetup(false);
+    setShowWorkspaceCodeInput(false);
+    setWorkspaceSetupInput("");
+    setWorkspaceSetupError("");
+  }
+
+  function createNewWorkspace() {
+    const nextWorkspaceKey = createWorkspaceKey();
+    window.localStorage.setItem(workspaceKeyPreferenceKey, nextWorkspaceKey);
+    setWorkspaceKey(nextWorkspaceKey);
+    setNeedsWorkspaceSetup(false);
+  }
+
   function clearInput() {
     setText("");
     setLoadedExample("");
@@ -370,6 +397,30 @@ export function IntakeWorkspace() {
 
   return (
     <>
+      {needsWorkspaceSetup ? (
+        <section className="workspace-setup" aria-label="Private workspace setup">
+          <p className="section-kicker">Private sync</p>
+          <h2>Do you already have a private sync code?</h2>
+          <p>This browser does not have a saved sync code yet. Enter your existing code to open your saved reviews, or create a new private workspace.</p>
+          {showWorkspaceCodeInput ? (
+            <div className="workspace-setup-form">
+              <label htmlFor="workspace-setup-code">Private sync code</label>
+              <input id="workspace-setup-code" value={workspaceSetupInput} autoComplete="off" spellCheck={false} onChange={(event) => setWorkspaceSetupInput(event.target.value)} />
+              {workspaceSetupError && <p className="workspace-setup-error" role="alert">{workspaceSetupError}</p>}
+              <div className="workspace-setup-actions">
+                <button className="save-input-button" type="button" onClick={useExistingWorkspaceCode}>Use this code</button>
+                <button className="preview-prompt-button" type="button" onClick={() => { setShowWorkspaceCodeInput(false); setWorkspaceSetupError(""); }}>Back</button>
+              </div>
+            </div>
+          ) : (
+            <div className="workspace-setup-actions">
+              <button className="save-input-button" type="button" onClick={() => setShowWorkspaceCodeInput(true)}>Yes, I have a code</button>
+              <button className="preview-prompt-button" type="button" onClick={createNewWorkspace}>No, create a new private workspace</button>
+            </div>
+          )}
+        </section>
+      ) : (
+        <>
       <section className="workspace-grid" aria-label="Study intake workspace">
         <div className="intake-panel">
           <div className="panel-heading">
@@ -424,6 +475,8 @@ export function IntakeWorkspace() {
       </section>
       <section className="template-section" aria-labelledby="template-title"><PromptTemplatePicker selectedTemplate={selectedTemplate} sourceLanguage={sourceLanguage} onTemplateChange={setSelectedTemplate} /></section>
       <SavedReview runs={reviewRuns} onOpen={openSavedRun} onUpdate={(run) => void updateSavedRun(run)} onDelete={(taskRunId) => void deleteSavedRun(taskRunId)} />
+        </>
+      )}
     </>
   );
 }
